@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AmericaBlocker",
+  "name": "Reddit America Blocker",
   "description": "Automatically hides Reddit posts containing American politics references. Keyword list is fully editable.",
   "version": "1.0.0",
 
@@ -30,7 +30,7 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "AmericaBlocker – click to open settings"
+    "default_title": "Reddit America Blocker – click to open settings"
   },
 
   "icons": {
