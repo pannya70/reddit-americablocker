@@ -36,12 +36,21 @@
       gap: 14px;
     }
     .header-icon {
-      width: 48px; height: 48px;
-      background: var(--red);
+      width: 48px;
+      height: 48px;
       border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
+      overflow: hidden;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+    }
+    .header-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
     .header h1 { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
     .header p  { color: var(--muted); font-size: 0.875rem; margin-top: 3px; }
@@ -233,7 +242,9 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="header-icon">🇺🇸</div>
+    <div class="header-icon">
+      <img src="../icons/icon48.png" alt="AmericaBlocker icon" />
+    </div>
     <div>
       <h1>AmericaBlocker</h1>
       <p>Filter American politics posts from Reddit</p>
