@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AmericaBlocker Settings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:    #c0392b;
+      --red-dk: #962d22;
+      --bg:     #f4f5f7;
+      --card:   #ffffff;
+      --border: #e1e4e8;
+      --text:   #24292e;
+      --muted:  #6a737d;
+      --green:  #27ae60;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    .page { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-icon {
+      width: 48px; height: 48px;
+      background: var(--red);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+    .header p  { color: var(--muted); font-size: 0.875rem; margin-top: 3px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+    }
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Toggle row ── */
+    .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+    .row:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .row-label { flex: 1; }
+    .row-label strong { display: block; font-size: 0.95rem; }
+    .row-label span   { font-size: 0.82rem; color: var(--muted); }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: #ccc;
+      border-radius: 24px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .switch input:checked + .slider { background: var(--green); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+
+    /* ── Stats card ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .stat-number {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--red);
+      line-height: 1;
+    }
+    .stat-label { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Radio group (hide vs dim) ── */
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-option {
+      flex: 1;
+      min-width: 120px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .radio-option input[type="radio"] { margin-top: 2px; accent-color: var(--red); }
+    .radio-option strong { display: block; font-size: 0.92rem; }
+    .radio-option span   { font-size: 0.8rem; color: var(--muted); }
+    .radio-option.selected {
+      border-color: var(--red);
+      background: #fdf3f2;
+    }
+
+    /* ── Keyword editor ── */
+    .kw-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .kw-add-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .kw-add-row input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .kw-add-row input:focus { border-color: var(--red); }
+
+    .kw-list {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .kw-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .kw-item:last-child { border-bottom: none; }
+    .kw-item:hover { background: #fafafa; }
+    .kw-item span { flex: 1; font-family: monospace; }
+    .kw-item button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 1rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+    .kw-item button:hover { color: var(--red); background: #fdf3f2; }
+
+    .kw-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 7px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary   { background: var(--red); color: #fff; }
+    .btn-primary:hover   { background: var(--red-dk); }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover { background: #d1d5db; }
+    .btn-danger    { background: #fdf3f2; color: var(--red); border: 1px solid #f5c6c2; }
+    .btn-danger:hover    { background: #fae4e2; }
+
+    /* ── Save bar ── */
+    .save-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .save-status {
+      font-size: 0.85rem;
+      color: var(--green);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .save-status.visible { opacity: 1; }
+
+    /* ── Import/export file input ── */
+    #importFile { display: none; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">🇺🇸</div>
+    <div>
+      <h1>AmericaBlocker</h1>
+      <p>Filter American politics posts from Reddit</p>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card">
+    <div class="card-title">All-time blocked posts</div>
+    <div class="stats-grid">
+      <div>
+        <div class="stat-number" id="blockedCount">–</div>
+        <div class="stat-label">posts filtered since install</div>
+      </div>
+      <button class="btn btn-danger" id="resetBtn">↺ Reset counter</button>
+    </div>
+  </div>
+
+  <!-- Extension toggle -->
+  <div class="card">
+    <div class="card-title">Extension</div>
+    <div class="row">
+      <div class="row-label">
+        <strong>Enable AmericaBlocker</strong>
+        <span>Turn filtering on or off globally</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabledToggle" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Filter behavior -->
+  <div class="card">
+    <div class="card-title">Filter behaviour</div>
+    <div class="radio-group" id="hideModeGroup">
+      <label class="radio-option selected" id="opt-hide">
+        <input type="radio" name="hideMode" value="hide" checked />
+        <div>
+          <strong>Hide completely</strong>
+          <span>Post is removed from the feed entirely</span>
+        </div>
+      </label>
+      <label class="radio-option" id="opt-dim">
+        <input type="radio" name="hideMode" value="dim" />
+        <div>
+          <strong>Dim &amp; blur</strong>
+          <span>Post stays in place but is obscured</span>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <!-- Keywords -->
+  <div class="card">
+    <div class="card-title">
+      Keywords
+      <span id="kwCount" style="font-weight:400;text-transform:none;color:var(--muted)"></span>
+    </div>
+
+    <!-- Quick-add -->
+    <div class="kw-add-row">
+      <input type="text" id="newKeyword" placeholder="Add a keyword or phrase…" autocomplete="off" />
+      <button class="btn btn-primary" id="addBtn">+ Add</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="kw-controls">
+      <button class="btn btn-secondary" id="exportBtn">⬇ Export JSON</button>
+      <button class="btn btn-secondary" id="importBtn">⬆ Import JSON</button>
+      <input type="file" id="importFile" accept=".json,application/json" />
+      <button class="btn btn-danger" id="resetKeywordsBtn">Restore defaults</button>
+    </div>
+
+    <!-- List -->
+    <div class="kw-list" id="kwList">
+      <div class="kw-empty">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Save -->
+  <div class="save-bar">
+    <button class="btn btn-primary" id="saveBtn" style="padding:10px 28px;font-size:0.95rem;">Save settings</button>
+    <span class="save-status" id="saveStatus">✓ Settings saved</span>
+  </div>
+
+</div>
+<script src="options.js"></script>
+</body>
+</html>
