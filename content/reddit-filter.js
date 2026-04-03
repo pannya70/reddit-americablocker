@@ -76,12 +76,26 @@ function compilePatterns(keywords) {
       // Keywords ending with punctuation (e.g. "u.s.") already have a
       // natural delimiter; adding \b after a non-word char is invalid.
       const leadBound  = /^\w/.test(kw) ? "\\b" : "";
-      const trailBound = /\w$/.test(kw)  ? "\\b" : "";
+      let trailPart = "";
+      if (/\w$/.test(kw)) {
+        // For regular word keywords (e.g. "trump"), allow simple inflections
+        // like "trumps" and "trump's" by permitting an optional trailing
+        // "'s" or "s" before the final word boundary.
+        //
+        // We *exclude* two-letter all-caps acronyms (e.g. "US") from this
+        // so that "US" still only matches the country abbreviation and not
+        // "US's" or similar.
+        if (!/^[A-Z]{2}$/.test(kw)) {
+          trailPart = "(?:'s|s)?\\b";
+        } else {
+          trailPart = "\\b";
+        }
+      }
       // Two-letter all-caps acronyms (e.g. "US", "UK") are compiled
       // case-sensitively so they don't match the pronoun "us" or similar.
       const flags = /^[A-Z]{2}$/.test(kw) ? "" : "i";
       try {
-        return new RegExp(`${leadBound}${escaped}${trailBound}`, flags);
+        return new RegExp(`${leadBound}${escaped}${trailPart}`, flags);
       } catch {
         return null;
       }
@@ -209,6 +223,55 @@ function processListItem(tracker) {
 }
 
 // ---------------------------------------------------------------------------
+// Popular carousel cards (home / /r/popular style)
+// Example structure in saved HTML:
+//   <div class="h-[210px] ... carousel-item-cover">
+//     <h2 ...>US Army chief asked to step down</h2>
+//     <p ... title="US Army chief ... sources say">US Army ...</p>
+//   </div>
+// ---------------------------------------------------------------------------
+function getPopularCarouselText(coverEl) {
+  const h2 = coverEl.querySelector("h2");
+  const p = coverEl.querySelector("p");
+  const title = h2 ? h2.textContent || "" : "";
+
+  // Prefer the full untruncated preview from the `title` attribute.
+  const desc = p ? (p.getAttribute("title") || p.textContent || "") : "";
+
+  return `${title} ${desc}`.trim();
+}
+
+function processPopularCarouselCard(coverEl) {
+  if (coverEl.dataset.abProcessed) return 0;
+  coverEl.dataset.abProcessed = "1";
+
+  if (!isEnabled) return 0;
+
+  const text = getPopularCarouselText(coverEl);
+  if (!text.trim()) return 0;
+
+  if (matchesAny(text)) {
+    applyBlock(coverEl);
+
+    // The image is a sibling to the overlay cover element, so dim/hide it too.
+    const tileAnchor = coverEl.closest("a");
+    const img = tileAnchor ? tileAnchor.querySelector("img") : null;
+    if (img) applyBlock(img);
+
+    return 1;
+  }
+  return 0;
+}
+
+function removePopularCarouselCard(coverEl) {
+  removeBlock(coverEl);
+
+  const tileAnchor = coverEl.closest("a");
+  const img = tileAnchor ? tileAnchor.querySelector("img") : null;
+  if (img) removeBlock(img);
+}
+
+// ---------------------------------------------------------------------------
 // Search bar typeahead / trending dropdown
 // <search-telemetry-tracker data-type="search-dropdown-item">
 //   <span data-type="search-dropdown-item-label-text">Trump Iran War Address</span>
@@ -237,10 +300,16 @@ function processDropdownItem(tracker) {
 }
 
 // ---------------------------------------------------------------------------
-// Search results page
-// Each item: <search-telemetry-tracker data-testid="search-sdui-post" data-thingid="t3_xxx">
-//   <a data-testid="post-title" aria-label="Title">  ← aria-label has the title
-//   <a data-testid="post-title-text">Title text</a>  ← visible title text
+// Search results page (including standard list + "Media" grid)
+// Primary layout:
+//   <search-telemetry-tracker data-testid="search-sdui-post" ...>
+//     <a data-testid="post-title" aria-label="Title">
+//     <a data-testid="post-title-text">Title text</a>
+//
+// Media layout:
+//   <search-telemetry-tracker view-events="search/view/post" ...>
+//     <div data-id="search-media-post-unit">...</div>
+//   (title lives only in data-faceplate-tracking-context.post.title)
 // ---------------------------------------------------------------------------
 function getSearchPostText(tracker) {
   // aria-label on the invisible accessible link is the fastest source
@@ -251,16 +320,22 @@ function getSearchPostText(tracker) {
   const titleText = tracker.querySelector('a[data-testid="post-title-text"]');
   const visibleText = titleText ? titleText.textContent : "";
 
-  // Snippet / description preview — stored in the tracking-context JSON
-  // as search.snippet.  This is reliable and avoids depending on fragile
-  // utility-class selectors that Reddit could rename at any time.
+  // Snippet / description preview and media titles — stored in the
+  // tracking-context JSON as search.snippet and post.title.
   let snippet = "";
+  let jsonTitle = "";
   try {
     const raw = tracker.getAttribute("data-faceplate-tracking-context");
-    if (raw) snippet = JSON.parse(raw)?.search?.snippet ?? "";
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      snippet = parsed?.search?.snippet ?? "";
+      jsonTitle = parsed?.post?.title ?? "";
+    }
   } catch { /* ignore malformed JSON */ }
 
-  return `${ariaLabel} ${visibleText} ${snippet}`;
+  // Combine everything; for media tiles where there is no DOM title,
+  // jsonTitle will carry the important text (e.g. "Trump is completely insane").
+  return `${ariaLabel} ${visibleText} ${jsonTitle} ${snippet}`;
 }
 
 function processSearchPost(tracker) {
@@ -303,6 +378,11 @@ function scanAll() {
     .querySelectorAll('faceplate-tracker[noun="recent_post"]:not([data-ab-processed])')
     .forEach((t) => { newBlocked += processListItem(t); });
 
+  // Popular carousel cards
+  document
+    .querySelectorAll("div.carousel-item-cover:not([data-ab-processed])")
+    .forEach((coverEl) => { newBlocked += processPopularCarouselCard(coverEl); });
+
   // Search results — two formats both use view-events="search/view/post":
   //   Format 1: <search-telemetry-tracker data-testid="search-sdui-post" ...>
   //   Format 2: <search-telemetry-tracker view-events="search/view/post" ...>  (no data-testid)
@@ -333,12 +413,17 @@ function rescanAll() {
   const lightDomSelector =
     'article[data-post-id], li.highlight-list-item, ' +
     'faceplate-tracker[noun="recent_post"], ' +
+    'div.carousel-item-cover, ' +
     'search-telemetry-tracker[view-events="search/view/post"], ' +
     'search-telemetry-tracker[data-type="search-dropdown-item"]';
 
   document.querySelectorAll(lightDomSelector).forEach((el) => {
     delete el.dataset.abProcessed;
-    removeBlock(el);
+    if (el.matches && el.matches("div.carousel-item-cover")) {
+      removePopularCarouselCard(el);
+    } else {
+      removeBlock(el);
+    }
   });
 
   // Also clear anything in the search bar shadow root
@@ -445,11 +530,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
         'article[data-post-id][data-ab-blocked], ' +
         'li.highlight-list-item[data-ab-blocked], ' +
         'faceplate-tracker[noun="recent_post"][data-ab-blocked], ' +
+        'div.carousel-item-cover[data-ab-blocked], ' +
         'search-telemetry-tracker[view-events="search/view/post"][data-ab-blocked], ' +
         'search-telemetry-tracker[data-type="search-dropdown-item"][data-ab-blocked]';
 
       document.querySelectorAll(lightDomBlocked).forEach((el) => {
-        removeBlock(el);
+        if (el.matches && el.matches("div.carousel-item-cover")) {
+          removePopularCarouselCard(el);
+        } else {
+          removeBlock(el);
+        }
         delete el.dataset.abProcessed;
       });
 
