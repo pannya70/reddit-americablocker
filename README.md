@@ -1,4 +1,4 @@
-# AmericaBlocker
+# Reddit-AmericaBlocker
 
 Filter American politics content from Reddit.
 
