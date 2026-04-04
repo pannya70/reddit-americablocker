@@ -1,0 +1,25 @@
+# Build / packaging
+dist/
+*.crx
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs / temp
+*.log
+npm-debug.log*
+.env
+.env.*
+
+# Optional: local HTML dumps used for dev reference (uncomment if you don’t want them in git)
+# *.html
