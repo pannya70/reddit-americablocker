@@ -130,7 +130,15 @@ function matchesAny(text) {
 // ---------------------------------------------------------------------------
 // Hide / dim
 // ---------------------------------------------------------------------------
-function applyBlock(article) {
+function applyBlock(article, options) {
+  // Carousel tiles are flex children of a shadow <ul>; dim/blur still reserves
+  // ~280px + margin — always collapse the slot so the row reflows.
+  if (options && options.carouselSlot) {
+    article.classList.add("ab-hidden");
+    article.classList.remove("ab-dimmed");
+    article.dataset.abBlocked = "1";
+    return;
+  }
   if (currentHideMode === "dim") {
     article.classList.add("ab-dimmed");
     article.classList.remove("ab-hidden");
@@ -224,12 +232,29 @@ function processListItem(tracker) {
 
 // ---------------------------------------------------------------------------
 // Popular carousel cards (home / /r/popular style)
-// Example structure in saved HTML:
-//   <div class="h-[210px] ... carousel-item-cover">
-//     <h2 ...>US Army chief asked to step down</h2>
-//     <p ... title="US Army chief ... sources say">US Army ...</p>
-//   </div>
+// The scroll row lives in <shreddit-gallery-carousel>'s shadow <ul>; each
+// slotted flex item is a *direct light-DOM child* of the host (outer
+// faceplate-tracker with shrink-0 + mr-md). Hiding only inner <li> or the
+// cover leaves that wrapper in the flex row → empty gaps. Collapse the host
+// child that owns this cover.
+//   <shreddit-gallery-carousel>
+//     <faceplate-tracker class="... shrink-0 mr-md">  ← collapse this
+//       <faceplate-tracker><li class="m-0"><a class="w-[280px]">
+//         <img /><div class="carousel-item-cover">…</div>
+//       </a></li></faceplate-tracker>
+//     </faceplate-tracker>
 // ---------------------------------------------------------------------------
+function getPopularCarouselSlotRoot(coverEl) {
+  const host = coverEl.closest("shreddit-gallery-carousel");
+  if (!host) return null;
+  let el = coverEl;
+  while (el.parentElement && el.parentElement !== host) {
+    el = el.parentElement;
+  }
+  if (el.parentElement !== host) return null;
+  return el.querySelector("div.carousel-item-cover") === coverEl ? el : null;
+}
+
 function getPopularCarouselText(coverEl) {
   const h2 = coverEl.querySelector("h2");
   const p = coverEl.querySelector("p");
@@ -251,23 +276,35 @@ function processPopularCarouselCard(coverEl) {
   if (!text.trim()) return 0;
 
   if (matchesAny(text)) {
-    applyBlock(coverEl);
-
-    // The image is a sibling to the overlay cover element, so dim/hide it too.
-    const tileAnchor = coverEl.closest("a");
-    const img = tileAnchor ? tileAnchor.querySelector("img") : null;
-    if (img) applyBlock(img);
-
+    const slotRoot = getPopularCarouselSlotRoot(coverEl);
+    if (slotRoot) {
+      applyBlock(slotRoot, { carouselSlot: true });
+    } else {
+      const tileLi = coverEl.closest("li.m-0");
+      if (tileLi && tileLi.querySelector("div.carousel-item-cover") === coverEl) {
+        applyBlock(tileLi, { carouselSlot: true });
+      } else {
+        applyBlock(coverEl);
+        const tileAnchor = coverEl.closest("a");
+        const img = tileAnchor ? tileAnchor.querySelector("img") : null;
+        if (img) applyBlock(img);
+      }
+    }
     return 1;
   }
   return 0;
 }
 
 function removePopularCarouselCard(coverEl) {
-  removeBlock(coverEl);
-
+  const slotRoot = getPopularCarouselSlotRoot(coverEl);
+  if (slotRoot) removeBlock(slotRoot);
+  const tileLi = coverEl.closest("li.m-0");
+  if (tileLi && tileLi.querySelector("div.carousel-item-cover") === coverEl) {
+    removeBlock(tileLi);
+  }
   const tileAnchor = coverEl.closest("a");
   const img = tileAnchor ? tileAnchor.querySelector("img") : null;
+  removeBlock(coverEl);
   if (img) removeBlock(img);
 }
 
@@ -530,6 +567,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
         'article[data-post-id][data-ab-blocked], ' +
         'li.highlight-list-item[data-ab-blocked], ' +
         'faceplate-tracker[noun="recent_post"][data-ab-blocked], ' +
+        'shreddit-gallery-carousel > [data-ab-blocked], ' +
+        'li.m-0[data-ab-blocked]:has(div.carousel-item-cover), ' +
         'div.carousel-item-cover[data-ab-blocked], ' +
         'search-telemetry-tracker[view-events="search/view/post"][data-ab-blocked], ' +
         'search-telemetry-tracker[data-type="search-dropdown-item"][data-ab-blocked]';
@@ -537,6 +576,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
       document.querySelectorAll(lightDomBlocked).forEach((el) => {
         if (el.matches && el.matches("div.carousel-item-cover")) {
           removePopularCarouselCard(el);
+        } else if (
+          el.parentElement &&
+          el.parentElement.tagName.toLowerCase() === "shreddit-gallery-carousel"
+        ) {
+          removeBlock(el);
+          el.querySelector("div.carousel-item-cover")?.removeAttribute("data-ab-processed");
+        } else if (el.matches && el.matches("li.m-0")) {
+          removeBlock(el);
+          el.querySelector("div.carousel-item-cover")?.removeAttribute("data-ab-processed");
         } else {
           removeBlock(el);
         }
