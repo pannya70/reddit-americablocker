@@ -16,6 +16,7 @@ const DEFAULT_KEYWORDS = [
   "pam bondi", "bondi",
   "aoc", "alexandria ocasio-cortez",
   "rand paul", "ted cruz",
+  "charlie kirk",
 
   // Parties / movements
   "maga", "republican", "democrat", "gop",
@@ -25,8 +26,13 @@ const DEFAULT_KEYWORDS = [
   "congress", "senate", "senator",
   "house of representatives",
   "white house", "oval office",
+  "president",
   "supreme court", "electoral college",
   "cia", "fbi", "nsa", "tsa", "dea", "atf",
+  "immigration and customs enforcement",
+  "ICE",
+  "ice raid",
+  "ice agents",
   "pentagon", "nato",
   "doge", "department of government efficiency",
   "federal reserve",
@@ -38,6 +44,19 @@ const DEFAULT_KEYWORDS = [
   "usa",   // matches "USA" — word-bounded so won't hit "kansas"
   "u.s.",  // matches "U.S." — period acts as natural delimiter
   "u.s.a.", // matches "U.S.A."
+
+  // US states + DC (local / state politics in feed)
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+  "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+  "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+  "maine", "maryland", "massachusetts", "michigan", "minnesota",
+  "mississippi", "missouri", "montana", "nebraska", "nevada",
+  "new hampshire", "new jersey", "new mexico", "new york",
+  "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
+  "pennsylvania", "rhode island", "south carolina", "south dakota",
+  "tennessee", "texas", "utah", "vermont", "virginia", "washington",
+  "west virginia", "wisconsin", "wyoming",
+  "district of columbia", "washington dc",
 
   // Countries / conflicts often in US political news
   "iran", "ukraine aid", "zelensky",
@@ -82,18 +101,17 @@ function compilePatterns(keywords) {
         // like "trumps" and "trump's" by permitting an optional trailing
         // "'s" or "s" before the final word boundary.
         //
-        // We *exclude* two-letter all-caps acronyms (e.g. "US") from this
-        // so that "US" still only matches the country abbreviation and not
-        // "US's" or similar.
-        if (!/^[A-Z]{2}$/.test(kw)) {
+        // All-caps acronym keywords (e.g. "US", "ICE") skip the optional
+        // inflection suffix so we don't match "US's" / odd plurals.
+        if (!/^[A-Z]{2,}$/.test(kw)) {
           trailPart = "(?:'s|s)?\\b";
         } else {
           trailPart = "\\b";
         }
       }
-      // Two-letter all-caps acronyms (e.g. "US", "UK") are compiled
-      // case-sensitively so they don't match the pronoun "us" or similar.
-      const flags = /^[A-Z]{2}$/.test(kw) ? "" : "i";
+      // Keywords that are entirely uppercase letters (2+) are compiled
+      // case-sensitively — e.g. "US" vs "us", "ICE" vs "ice cream".
+      const flags = /^[A-Z]{2,}$/.test(kw) ? "" : "i";
       try {
         return new RegExp(`${leadBound}${escaped}${trailPart}`, flags);
       } catch {
