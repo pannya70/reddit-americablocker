@@ -8,6 +8,7 @@
   "host_permissions": ["*://*.reddit.com/*"],
 
   "background": {
+    "scripts": ["background/service_worker.js"],
     "service_worker": "background/service_worker.js"
   },
 
